@@ -21,7 +21,7 @@ from vllm.parser.parser_manager import ParserManager
 # Model checkpoints mapped to their registered vLLM tool parser name
 TOOL_CALLING_MODELS = [
     ("ibm-granite/granite-3.3-8b-instruct", "granite"),
-    ("ibm-granite/granite-4.1-8b", "granite"),
+    ("ibm-granite/granite-4.1-8b", "hermes"),
     ("meta-llama/Llama-3.1-8B-Instruct", "llama3_json"),
 ]
 

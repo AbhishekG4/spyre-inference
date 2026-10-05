@@ -79,8 +79,8 @@ def test_decoder_tool_calling(
 
     # Dynamically get and initialize parser via ParserManager
     tokenizer = llm.get_tokenizer()
-    parser_cls = ParserManager.get_tool_parser(parser_name)
-    parser = parser_cls(tokenizer=tokenizer, enable_auto_tools=True)
+    parser_cls = ParserManager.get_tool_parser(parser_name, enable_auto_tools=True)
+    parser = parser_cls(tokenizer=tokenizer)
 
     # Construct a dummy class for request since extract_tool_calls
     # takes a request object but does not access any of its properties.

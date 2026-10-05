@@ -23,6 +23,8 @@ TOOL_CALLING_MODELS = [
     ("ibm-granite/granite-3.3-8b-instruct", "granite"),
     ("ibm-granite/granite-4.1-8b", "hermes"),
     ("meta-llama/Llama-3.1-8B-Instruct", "llama3_json"),
+    ("mistralai/Mistral-Small-3.2-24B-Instruct-2506", "mistral"),
+    ("google/gemma-4-26B-A4B-it", "gemma4"),
 ]
 
 

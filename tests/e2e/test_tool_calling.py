@@ -13,30 +13,38 @@
 # limitations under the License.
 
 import json
+
 import pytest
 from vllm import LLM, SamplingParams
-from vllm.tool_parsers.granite_tool_parser import GraniteToolParser
+from vllm.parser.parser_manager import ParserManager
+
+# Model checkpoints mapped to their registered vLLM tool parser name
+TOOL_CALLING_MODELS = [
+    ("ibm-granite/granite-3.3-8b-instruct", "granite"),
+    ("ibm-granite/granite-4.1-8b", "granite"),
+    ("meta-llama/Llama-3.1-8B-Instruct", "llama3_json"),
+]
 
 
 @pytest.mark.uses_subprocess
-def test_granite_tool_calling():
-    """Verify tool calling works for Granite 3.3 instruct model."""
-    model_name = "ibm-granite/granite-3.3-8b-instruct"
-
-    # Initialize the LLM with Granite instruct model.
+@pytest.mark.parametrize("model,parser_name", TOOL_CALLING_MODELS)
+def test_decoder_tool_calling(
+    model: str,
+    parser_name: str,
+):
+    """Verify tool calling works for decoder models using ToolParserManager."""
+    # Initialize the LLM with the specified model.
     # We do not specify local chat_template path, vLLM will automatically
     # load the default built-in chat template from the model tokenizer.
     llm = LLM(
-        model=model_name,
+        model=model,
         max_model_len=512,
-        max_num_seqs=64,
+        max_num_seqs=1,
         tensor_parallel_size=1,
     )
 
     # Prepare user query and tool definition
-    messages = [
-        {"role": "user", "content": "List all files in the /tmp directory."}
-    ]
+    messages = [{"role": "user", "content": "List all files in the /tmp directory."}]
 
     tools = [
         {
@@ -46,12 +54,10 @@ def test_granite_tool_calling():
                 "description": "List files in a directory",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "path": {"type": "string", "description": "Directory path"}
-                    },
-                    "required": ["path"]
-                }
-            }
+                    "properties": {"path": {"type": "string", "description": "Directory path"}},
+                    "required": ["path"],
+                },
+            },
         }
     ]
 
@@ -71,27 +77,32 @@ def test_granite_tool_calling():
     generated_text = outputs[0].outputs[0].text
     print(f"Generated text: {generated_text}")
 
-    # Use the vLLM GraniteToolParser to extract tool calls from the output
+    # Dynamically get and initialize parser via ParserManager
     tokenizer = llm.get_tokenizer()
-    parser = GraniteToolParser(tokenizer=tokenizer)
-    
-    # Construct a dummy class for request since GraniteToolParser.extract_tool_calls
+    parser_cls = ParserManager.get_tool_parser(parser_name)
+    parser = parser_cls(tokenizer=tokenizer, enable_auto_tools=True)
+
+    # Construct a dummy class for request since extract_tool_calls
     # takes a request object but does not access any of its properties.
     class DummyRequest:
         pass
-        
+
     extracted = parser.extract_tool_calls(generated_text, DummyRequest())
-    
+
     # Assert that tool calls were detected and successfully extracted
-    assert extracted.tools_called, f"Expected tool calls to be extracted, but parser returned: {extracted}"
-    assert hasattr(extracted, "tool_calls"), "Extracted object does not have a 'tool_calls' attribute"
+    assert extracted.tools_called, (
+        f"Expected tool calls to be extracted, but parser returned: {extracted}"
+    )
+    assert hasattr(extracted, "tool_calls"), (
+        "Extracted object does not have a 'tool_calls' attribute"
+    )
     assert extracted.tool_calls is not None, "'tool_calls' attribute is None"
     assert len(extracted.tool_calls) > 0, "'tool_calls' list is empty"
-    
+
     tool_call = extracted.tool_calls[0]
     assert tool_call.type == "function"
     assert tool_call.function.name == "list_files"
-    
+
     # Parse and verify function arguments
     arguments = json.loads(tool_call.function.arguments)
     assert arguments.get("path") == "/tmp"
